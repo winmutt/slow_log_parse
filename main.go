@@ -15,16 +15,16 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	f "fmt"
+	"github.com/percona/go-mysql/event"
 	"github.com/percona/go-mysql/log"
 	parser "github.com/percona/go-mysql/log/slow"
-	"github.com/percona/go-mysql/event"
 	"github.com/percona/go-mysql/query"
-	"encoding/json"
 	"os"
+	"sync"
 	"time"
-  "sync"
 )
 
 func handleErr(e error) {
@@ -77,48 +77,48 @@ func parseSlowLog(fh *os.File) {
 		if val, ok := log_channels[e.NumberMetrics["Thread_id"]]; ok {
 			val <- e
 		} else {
-      // f.Println("Creating channel for ", e.NumberMetrics["Thread_id"])
+			// f.Println("Creating channel for ", e.NumberMetrics["Thread_id"])
 			log_channels[e.NumberMetrics["Thread_id"]] = make(chan *log.Event, 100)
-      wg.Add(1)
+			wg.Add(1)
 
 			// this listener aggregates sessions stats.
-			go func (thread_id uint64, log_events chan *log.Event) {
-        wg.Done()
+			go func(thread_id uint64, log_events chan *log.Event) {
+				wg.Done()
 
-      	a := event.NewAggregator(false /* we dont want PII */, 0 /* utc offset */, 0 /* long query time */)
-        ch_open := true
-      	for ch_open == true {
-      		select {
-      		case e, open := <-log_events:
-              ch_open = open
-              if ch_open {
-                fp := query.Fingerprint(e.Query)
-                if fp == "quit" {
-                  ch_open = false;
-                }
+				a := event.NewAggregator(false /* we dont want PII */, 0 /* utc offset */, 0 /* long query time */)
+				ch_open := true
+				for ch_open == true {
+					select {
+					case e, open := <-log_events:
+						ch_open = open
+						if ch_open {
+							fp := query.Fingerprint(e.Query)
+							if fp == "quit" {
+								ch_open = false
+							}
 
-                if fp != "set @sql_context_injection=?" {
-              		id := query.Id(fp)
-          		    a.AddEvent(e, id, fp)
-                }
-              }
-      		case <-time.After(time.Millisecond):
-      		}
-      	}
-      	got := a.Finalize()
-      	gotJson, err := json.MarshalIndent(got, "", "  ")
+							if fp != "set @sql_context_injection=?" {
+								id := query.Id(fp)
+								a.AddEvent(e, id, fp)
+							}
+						}
+					case <-time.After(time.Millisecond):
+					}
+				}
+				got := a.Finalize()
+				gotJson, err := json.MarshalIndent(got, "", "  ")
 
-      	handleErr(err)
+				handleErr(err)
 
-      	f.Printf("%d: %s\n", thread_id, gotJson)
-      } (e.NumberMetrics["Thread_id"], log_channels[e.NumberMetrics["Thread_id"]])
+				f.Printf("%d: %s\n", thread_id, gotJson)
+			}(e.NumberMetrics["Thread_id"], log_channels[e.NumberMetrics["Thread_id"]])
 		}
 	}
 
 	for _, v := range log_channels {
-    close(v)
-  }
-  wg.Wait()
+		close(v)
+	}
+	wg.Wait()
 }
 
 func main() {
