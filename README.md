@@ -24,7 +24,7 @@ Feel free to submit any PR's, I'll happily work with any changes submitted.
 
 ## Authors
 
-* **Rolf Martin-Hoster** - *Initial work* - [PurpleBooth](https://github.com/winmutt)
+* **Rolf Martin-Hoster** - *Initial work* - [@winmutt](https://github.com/winmutt)
 
 ## License
 
