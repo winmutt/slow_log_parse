@@ -16,15 +16,18 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	f "fmt"
+	"os"
+	"runtime/pprof"
+	"sync"
+	"time"
+
 	"github.com/percona/go-mysql/event"
 	"github.com/percona/go-mysql/log"
 	parser "github.com/percona/go-mysql/log/slow"
 	"github.com/percona/go-mysql/query"
-	"os"
-	"sync"
-	"time"
 )
 
 func handleErr(e error) {
@@ -34,13 +37,7 @@ func handleErr(e error) {
 	}
 }
 
-func loadSlowLog() *os.File {
-	fname := flag.String("f", "", "filename")
-	flag.Parse()
-	if *fname == "" {
-		f.Println("Please pass a filename to parse")
-		os.Exit(1)
-	}
+func loadSlowLog(fname *string) *os.File {
 
 	fh, err := os.Open(*fname)
 	handleErr(err)
@@ -63,64 +60,133 @@ func loadSlowLog() *os.File {
 // SELECT `Campaign_Automation`.`campaign_id` AS `Campaign_Automation__campaign_id`, ......
 
 func parseSlowLog(fh *os.File) {
-	wg := sync.WaitGroup{}
-	o := log.Options{}
+	// event wg
+	eg := sync.WaitGroup{}
+	// result wg
+	rg := sync.WaitGroup{}
 
-	p := parser.NewSlowLogParser(fh, o)
+	p := parser.NewSlowLogParser(fh, log.Options{})
 
 	go p.Start()
 
-	// sorted_log := make(map[uint64][]*log.Event)
-	log_channels := make(map[uint64]chan *log.Event)
+	logChannels := make(map[uint64]chan *log.Event)
+	resultChannel := make(chan event.Result, 10000)
 
 	for e := range p.EventChan() {
-		if val, ok := log_channels[e.NumberMetrics["Thread_id"]]; ok {
+		threadID := e.NumberMetrics["Thread_id"]
+		if threadID == 0 {
+			threadID = e.ThreadID
+		}
+		if val, ok := logChannels[threadID]; ok {
 			val <- e
 		} else {
-			// f.Println("Creating channel for ", e.NumberMetrics["Thread_id"])
-			log_channels[e.NumberMetrics["Thread_id"]] = make(chan *log.Event, 100)
-			wg.Add(1)
+			// f.Println("Creating channel for ", threadID)
+			logChannels[threadID] = make(chan *log.Event, 1000)
+			eg.Add(1)
 
 			// this listener aggregates sessions stats.
-			go func(thread_id uint64, log_events chan *log.Event) {
-				wg.Done()
+			go func(threadID uint64, log_events <-chan *log.Event, resultChannel chan<- event.Result) {
+				defer eg.Done()
 
 				a := event.NewAggregator(false /* we dont want PII */, 0 /* utc offset */, 0 /* long query time */)
-				ch_open := true
-				for ch_open == true {
+
+				var open bool
+				open = true
+				var e *log.Event
+
+				for open == true {
 					select {
-					case e, open := <-log_events:
-						ch_open = open
-						if ch_open {
+					case e, open = <-log_events:
+						if open {
 							fp := query.Fingerprint(e.Query)
+
+							//helps us manage goroutine counts
 							if fp == "quit" {
-								ch_open = false
+								open = false
 							}
 
-							if fp != "set @sql_context_injection=?" {
-								id := query.Id(fp)
-								a.AddEvent(e, id, fp)
-							}
+							//need to add filtering support ???
+							id := query.Id(fp)
+							a.AddEvent(e, id, fp)
+
 						}
 					case <-time.After(time.Millisecond):
 					}
 				}
-				got := a.Finalize()
-				gotJson, err := json.MarshalIndent(got, "", "  ")
 
-				handleErr(err)
+				// aggregate the results back into the result channel
+				resultChannel <- a.Finalize()
 
-				f.Printf("%d: %s\n", thread_id, gotJson)
-			}(e.NumberMetrics["Thread_id"], log_channels[e.NumberMetrics["Thread_id"]])
+			}(threadID, logChannels[threadID], resultChannel)
 		}
 	}
 
-	for _, v := range log_channels {
+	// ensure we wait for the resultChannel to close
+	rg.Add(1)
+	go func(resultChannel chan event.Result) {
+		defer rg.Done()
+
+		results := make([]event.Result, 1)
+
+	result_loop:
+		for {
+			select {
+			case r, open := <-resultChannel:
+				if !open {
+					break result_loop
+				}
+				results = append(results, r)
+			case <-time.After(time.Millisecond):
+			default:
+			}
+		}
+
+		gotJSON, err := json.Marshal(results)
+
+		handleErr(err)
+
+		f.Println(string(gotJSON))
+	}(resultChannel)
+
+	// at the end of processing the log, we force the log channels to close so
+	// that they are notified that is all the data they are going to receive
+	// and call finalize
+	for _, v := range logChannels {
 		close(v)
 	}
-	wg.Wait()
+	// wait for all the slow log go routines to close
+	eg.Wait()
+
+	close(resultChannel)
+	rg.Wait()
+
 }
 
 func main() {
-	parseSlowLog(loadSlowLog())
+	flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+	flag.ErrHelp = errors.New("flag: help requested")
+
+	flag.Usage = func() {
+		f.Printf("Usage of %s:\n", os.Args[0])
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+	cpuprofile := flag.String("cpuprofile", "", "write cpu profile to file")
+	fname := flag.String("f", "", "File name of slow log to parse, required")
+
+	flag.Parse()
+	if *fname == "" {
+		flag.Usage()
+	}
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			handleErr(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+	parseSlowLog(loadSlowLog(fname))
 }
