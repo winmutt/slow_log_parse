@@ -1,6 +1,6 @@
 # slow_log_parse
 
-Parses mysq slow logs, aggregates by thread id or query, outputs in json. This is a limited use drop in replacement for the perl version of pt-query-digest
+Parses mysql slow logs, aggregates by thread id or query, outputs in json. This is a limited use drop in replacement for the perl version of pt-query-digest
 
 ## Getting Started
 
@@ -24,7 +24,7 @@ Feel free to submit any PR's, I'll happily work with any changes submitted.
 
 ## Authors
 
-* **Rolf Martin-Hoster** - *Initial work* - [PurpleBooth](https://github.com/winmutt)
+* **Rolf Martin-Hoster** - *Initial work* - [@winmutt](https://github.com/winmutt)
 
 ## License
 
