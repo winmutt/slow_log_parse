@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+set -e
+
+cd "$(dirname "$0")/.."
+
+log() {
+  echo -e "\e[32m==> $*...\e[0m"
+}
+
+log2() {
+  echo -e "\e[32m====> $*...\e[0m"
+}
+
+ok() {
+  echo -e "    \e[1mOK\e[0m"
+}
+
+fail() {
+  echo -e "\e[1m\e[41m!!! $*\e[0m"
+  exit 1
+}
+
+mkdir -p build/{linux,darwin}
+
+log "Building (slow_log_parse) for darwin"
+GOOS=darwin go build -o build/darwin/slow_log_parse main.go || fail
+ok
+
+log "Building (slow_log_parse) for linux"
+GOOS=linux go build -o build/linux/slow_log_parse main.go || fail
+ok
