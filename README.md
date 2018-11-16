@@ -13,13 +13,18 @@ The following go package is used:
 https://github.com/percona/go-mysql
 ```
 
+However as I am awaiting on https://github.com/percona/go-mysql/pull/38 to be merged, the following branch is needed:
+```
+https://github.com/winmutt/go-mysql/tree/thread_id_support
+```
+
 ## Running the tests
 
-Tests, what are those? percona/go-mysql has great tests covering a wide variety of slow log formats
+Tests, what are those? percona/go-mysql has great tests covering a wide variety of slow log formats, sadly I do not have any for slow_log_parse yet.
 
 ## Contributing
 
-Feel free to submit any PR's, I'll happily work with any changes submitted.
+Feel free to submit any PR's, I'll happily work with any contributors.
 
 
 ## Authors
