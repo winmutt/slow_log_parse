@@ -3,26 +3,14 @@
 
 [[projects]]
   branch = "thread_id_support"
-  digest = "1:0f8162d0ace7823a2f2e408b5e342a8bad0cd83ad95cb093a0ec858d4267ac17"
   name = "github.com/percona/go-mysql"
-  packages = [
-    "event",
-    "log",
-    "log/slow",
-    "query",
-  ]
-  pruneopts = "UT"
+  packages = ["event","log","log/slow","query"]
   revision = "ccc6f593ad42530298ff7bbcb8df2b5157bed053"
   source = "github.com/winmutt/go-mysql"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  input-imports = [
-    "github.com/percona/go-mysql/event",
-    "github.com/percona/go-mysql/log",
-    "github.com/percona/go-mysql/log/slow",
-    "github.com/percona/go-mysql/query",
-  ]
+  inputs-digest = "41d7be13cc720fa950ae52588ba0c4998d519d920c55ff7c4d79f138cad291bd"
   solver-name = "gps-cdcl"
   solver-version = 1

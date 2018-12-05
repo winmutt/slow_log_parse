@@ -23,10 +23,16 @@ fail() {
 
 mkdir -p build/{linux,darwin}
 
-log "Building (slow_log_parse) for darwin"
-GOOS=darwin go build -o build/darwin/slow_log_parse cmd/main.go || fail
-ok
+if [[ -z $1 || $1 == 'darwin' ]]; then
+  mkdir -p build/darwin
+  log "Building (slow_log_parse) for darwin"
+  GOOS=darwin go build -o build/darwin/slow_log_parse cmd/main.go || fail
+  ok
+fi;
 
-log "Building (slow_log_parse) for linux"
-GOOS=linux go build -o build/linux/slow_log_parse cmd/main.go || fail
-ok
+if [[ -z $1 || $1 == 'linux' ]]; then
+  mkdir -p build/linux
+  log "Building (slow_log_parse) for linux"
+  GOOS=linux go build -o build/linux/slow_log_parse cmd/main.go || fail
+  ok
+fi;
