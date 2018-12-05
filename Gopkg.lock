@@ -2,8 +2,8 @@
 
 
 [[projects]]
-  branch = "master"
-  digest = "1:37e7d147e1ff52e3e305a39ba486f96fdf01ad53382ef7852c321b84838ec8b2"
+  branch = "thread_id_support"
+  digest = "1:0f8162d0ace7823a2f2e408b5e342a8bad0cd83ad95cb093a0ec858d4267ac17"
   name = "github.com/percona/go-mysql"
   packages = [
     "event",
@@ -12,7 +12,8 @@
     "query",
   ]
   pruneopts = "UT"
-  revision = "fcc02662957597587e907ae09d5f61957de9cee9"
+  revision = "ccc6f593ad42530298ff7bbcb8df2b5157bed053"
+  source = "github.com/winmutt/go-mysql"
 
 [solve-meta]
   analyzer-name = "dep"
