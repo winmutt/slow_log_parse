@@ -26,8 +26,8 @@
 
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/percona/go-mysql"
+  branch = "thread_id_support"
+  name = "github.com/winmutt/go-mysql"
 
 [prune]
   go-tests = true
