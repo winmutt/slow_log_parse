@@ -107,7 +107,7 @@ func parseSlowLog(fh *os.File) {
 				defer eg.Done()
 
 				// TODO - add args for these params
-				a := event.NewAggregator(false /* we dont want PII from raw queries */, 0 /* utc offset */, 0 /* long query time */)
+				a := event.NewAggregator(true /* we need context */, 0 /* utc offset */, 0 /* long query time */)
 
 				open := true
 				var e *log.Event
