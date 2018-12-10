@@ -46,7 +46,7 @@ func loadSlowLog(fname *string) *os.File {
 
 }
 
-func parseSlowLog(fh *os.File) {
+func parseSlowLog(fh *os.File, tsMin *float64, exampleLimit *int) {
 	// event wg
 	eg := sync.WaitGroup{}
 	// result wg
@@ -74,11 +74,16 @@ func parseSlowLog(fh *os.File) {
 				if !open {
 					break result_loop
 				}
-				gotJSON, err := json.Marshal(r)
 
-				handleErr(err)
+				if queryTime, ok := r.Global.Metrics.TimeMetrics["Query_time"]; ok {
+					if queryTime.Sum > *tsMin {
+						gotJSON, err := json.Marshal(r)
 
-				f.Println(string(gotJSON))
+						handleErr(err)
+
+						f.Println(string(gotJSON))
+					}
+				}
 			case <-time.After(time.Millisecond):
 			default:
 			}
@@ -103,7 +108,7 @@ func parseSlowLog(fh *os.File) {
 			eg.Add(1)
 
 			// this listener aggregates sessions stats.
-			go func(threadID uint64, log_events <-chan *log.Event, resultChannel chan<- event.Result) {
+			go func(threadID uint64, log_events <-chan *log.Event, resultChannel chan<- event.Result, exampleLimit *int) {
 				defer eg.Done()
 
 				// TODO - add args for these params
@@ -117,6 +122,9 @@ func parseSlowLog(fh *os.File) {
 					select {
 					case e, open = <-log_events:
 						if open {
+							if len(e.Query) > *exampleLimit {
+								e.Query = e.Query[0:*exampleLimit]
+							}
 							fp := query.Fingerprint(e.Query)
 
 							//helps us manage goroutine counts
@@ -138,7 +146,7 @@ func parseSlowLog(fh *os.File) {
 				// aggregate the results back into the result channel
 				resultChannel <- a.Finalize()
 
-			}(threadID, logChannels[threadID], resultChannel)
+			}(threadID, logChannels[threadID], resultChannel, exampleLimit)
 		}
 	}
 
@@ -171,6 +179,8 @@ func main() {
 	}
 	cpuprofile := flag.String("cpuprofile", "", "useful for debugging only, write cpu profile to file")
 	fname := flag.String("f", "", "File name of slow log to parse, REQUIRED")
+	tsMin := flag.Float64("t", 1, "minimum amount of time to report")
+	exampleLimit := flag.Int("example-limit", 2048, " limit length of examples")
 
 	flag.Parse()
 	if *fname == "" {
@@ -185,5 +195,5 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
-	parseSlowLog(loadSlowLog(fname))
+	parseSlowLog(loadSlowLog(fname), tsMin, exampleLimit)
 }
